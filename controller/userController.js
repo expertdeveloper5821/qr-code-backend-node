@@ -198,7 +198,7 @@ exports.send_user_password_reset_email = async (req, res) => {
           from: process.env.EMAIL_FROM,
           to: user.email,
           subject: "Rozi-Roti Reset Password link",
-          html: `Hi This email send to <a href=${link}>Click Here</a> TO Reset Your Password, This link will expire within 5 minutes`,
+          html: `Hi This email send to reset you password, please <a href=${link}>Click Here</a>, This link will expire within 5 minutes`,
         });
         return res.status(200).json({
           message: "Password Reset link Sent... Please check your Email",
