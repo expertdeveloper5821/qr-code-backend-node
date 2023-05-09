@@ -13,6 +13,7 @@ exports.register_user = async (req, res) => {
     const {
       firstName,
       lastName,
+      companyName,
       mobileNumber,
       email,
       password,
@@ -29,6 +30,12 @@ exports.register_user = async (req, res) => {
     if (!lastName) {
       return res.status(400).json({
         error: { message: `Last name is required.` },
+      });
+    }
+
+    if (!companyName) {
+      return res.status(400).json({
+        error: { message: `Company name is required.` },
       });
     }
 
@@ -108,6 +115,7 @@ exports.register_user = async (req, res) => {
     const newUser = {
       firstName,
       lastName,
+      companyName,
       mobileNumber,
       email,
       password: password_hash,
