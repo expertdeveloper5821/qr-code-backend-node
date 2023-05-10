@@ -32,7 +32,7 @@ services:
     volumes:
       - postgresData:/var/lib/postgresql/data
     ports:
-      - "4321:5432"
+      - "5678:5432"
     networks:
       - rozi-roti
 
