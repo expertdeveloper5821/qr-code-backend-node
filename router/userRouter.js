@@ -23,6 +23,6 @@ router.post("/sendmail", userController.send_user_password_reset_email);
 router.post("/reset-password", userController.user_password_reset);
 
 //change password route
-router.post("/change-password/:id", userController.user_password_change);
+router.post("/change-password/:id", helper.checkToken, userController.user_password_change);
 
 module.exports = router;
