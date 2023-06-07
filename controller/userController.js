@@ -1,11 +1,12 @@
-import db from "../config/db";
-const User = db.user;
+import User from "../models/userModel";
+import credentials from "../config/credential.json";
 import helper from "../utils/helper";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import transporter from "../middleware/emailConfig";
 import * as dotenv from "dotenv";
 dotenv.config();
+import { google } from "googleapis";
 
 // Register_User api
 exports.register_user = async (req, res) => {
@@ -13,6 +14,7 @@ exports.register_user = async (req, res) => {
     const {
       firstName,
       lastName,
+      companyName,
       mobileNumber,
       email,
       password,
@@ -29,6 +31,12 @@ exports.register_user = async (req, res) => {
     if (!lastName) {
       return res.status(400).json({
         error: { message: `Last name is required.` },
+      });
+    }
+
+    if (!companyName) {
+      return res.status(400).json({
+        error: { message: `Company name is required.` },
       });
     }
 
@@ -60,7 +68,7 @@ exports.register_user = async (req, res) => {
     }
 
     // Check if email already exists or not
-    const user_email = await User.findOne({ where: { email } });
+    const user_email = await User.findOne({ email });
     if (user_email) {
       return res.status(401).json({
         error: {
@@ -105,17 +113,18 @@ exports.register_user = async (req, res) => {
     const confirm_password_hash = await bcrypt.hash(confirmPassword, salt);
 
     // Create the new user
-    const newUser = {
+    const doc = new User({
       firstName,
       lastName,
+      companyName,
       mobileNumber,
       email,
       password: password_hash,
       confirmPassword: confirm_password_hash,
-    };
+    });
     // Save the user
-    const user_saved = await User.create(newUser);
-    if (user_saved.id) {
+    const user_saved = await doc.save();
+    if (user_saved?._id) {
       return res.status(200).json({ message: "User registered Successfully" });
     } else {
       return res.status(200).json({ message: "User not registered" });
@@ -139,7 +148,7 @@ exports.login_user = async (req, res) => {
         error: { message: `Password is required.` },
       });
     }
-    const user = await User.findOne({ where: { email: email } });
+    const user = await User.findOne({ email: email });
     if (user !== null) {
       const is_password_match = await bcrypt.compare(password, user.password);
       if (is_password_match) {
@@ -147,7 +156,7 @@ exports.login_user = async (req, res) => {
         const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET, {
           expiresIn: "1d",
         });
-        await User.update({ token: token }, { where: { id: user.id } });
+        await User.findOneAndUpdate({ token: token },  { id: user.id } );
         return res.status(200).json({
           message: "User login successful",
           token: token,
@@ -164,11 +173,93 @@ exports.login_user = async (req, res) => {
   }
 };
 
+// Attendance endpoint
+// attendanceController.js
+exports.record_attendance = async (req, res) => {
+  try {
+    const { userId } = req.body;
+
+    // Retrieve the user from the database based on the provided userId
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // Check if the user has already recorded attendance in the last 12 hours
+    const currentTime = new Date();
+    const lastAttendanceTime = user.lastAttendanceTime;
+    const twelveHoursInMilliseconds = 12 * 60 * 60 * 1000; // 12 hours in milliseconds
+    if (
+      lastAttendanceTime &&
+      currentTime - lastAttendanceTime < twelveHoursInMilliseconds
+    ) {
+      return res.status(401).json({
+        message: "You can record attendance only once every 12 hours.",
+      });
+    }
+
+    // Generate the login time
+    const loginTime = new Date().toLocaleString("en-IN", {
+      timeZone: "Asia/Kolkata",
+    }); // Current timestamp in ISO time format
+
+    // Create a JWT client using the credentials
+    const jwtClient = new google.auth.JWT(
+      credentials.client_email,
+      null,
+      credentials.private_key,
+      ["https://www.googleapis.com/auth/spreadsheets"]
+    );
+
+    // Authorize the client
+    await jwtClient.authorize();
+
+    // Prepare the data to be written to the spreadsheet
+    const spreadsheetId = "16TAqd6qwGIstzG5jXTssgC8gLM_j4z0PYJtWbRSX2I8";
+    const range = "Sheet1!A:G"; // Assuming the data should be written in columns A and B starting from row 2
+    const values = [
+      [
+        userId,
+        user.firstName,
+        user.lastName,
+        user.email,
+        user.mobileNumber,
+        user.companyName,
+        loginTime,
+      ],
+    ]; // Change this to the desired data
+
+    // Create a Sheets API instance
+    const sheets = google.sheets({ version: "v4", auth: jwtClient });
+
+    // Write the data to the spreadsheet
+    const request = {
+      spreadsheetId,
+      range,
+      valueInputOption: "USER_ENTERED",
+      resource: { values },
+    };
+    const response = await sheets.spreadsheets.values.append(request);
+
+    // Update the lastAttendanceTime for the user
+    user.lastAttendanceTime = currentTime;
+    await user.save();
+
+    return res
+      .status(200)
+      .json({ message: "Attendance recorded successfully" });
+  } catch (error) {
+    console.error("Error in recordAttendance:", error);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+
 // Logout_User api
 exports.logout_user = async (req, res) => {
   try {
     const userId = req.params.id; // get user ID from the decoded token
-    const user = await User.findByPk(userId);
+    const user = await User.findById(userId);
     if (!user) {
       return res.status(200).json({ message: "User not found" });
     } else {
@@ -185,7 +276,7 @@ exports.send_user_password_reset_email = async (req, res) => {
   try {
     const { email } = req.body;
     if (email) {
-      const user = await User.findOne({ where: { email: email } });
+      const user = await User.findOne({ email: email });
       if (user) {
         // generate token
         const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET, {
@@ -202,7 +293,6 @@ exports.send_user_password_reset_email = async (req, res) => {
         });
         return res.status(200).json({
           message: "Password Reset link Sent... Please check your Email",
-          info: info,
         });
       } else {
         return res.status(500).json({ message: "Email Doesn't exists" });
@@ -224,7 +314,7 @@ exports.user_password_reset = async (req, res) => {
   try {
     const token = req.query.token;
     const decode = jwt.verify(token, process.env.JWT_SECRET);
-    const user = await User.findByPk(decode.userId);
+    const user = await User.findById(decode.userId);
     if (!newPassword) {
       return res.status(400).json({
         error: { message: "New password is required." },
@@ -253,7 +343,7 @@ exports.user_password_reset = async (req, res) => {
     } else {
       const salt = await bcrypt.genSalt(10);
       const newHashpassword = await bcrypt.hash(newPassword, salt);
-      await user.update({ password: newHashpassword });
+      await User.findOneAndUpdate(user._id, { $set: {password: newHashpassword} });
       return res.status(200).json({ message: "Password Reset Successfully" });
     }
   } catch (error) {
@@ -269,7 +359,7 @@ exports.user_password_change = async (req, res) => {
 
   try {
     // Check if the old password matches the current password
-    const user = await User.findByPk(userId);
+    const user = await User.findById(userId);
     const is_password_valid = await bcrypt.compare(oldPassword, user.password);
     if (!is_password_valid) {
       return res.status(401).json({
@@ -302,14 +392,12 @@ exports.user_password_change = async (req, res) => {
     // Hash and save the new password
     const salt = await bcrypt.genSalt(10);
     const newHashpassword = await bcrypt.hash(newPassword, salt);
-    await User.update({ password: newHashpassword }, { where: { id: userId } });
+    await User.findOneAndUpdate({ _id: userId }, { password: newHashpassword });
 
     return res.status(200).json({ message: "Password changed successfully." });
   } catch (error) {
-    console.error(
-      "Error in user_password_change => user_password_change",
-      error
-    );
+    console.error("Error in user_password_change => user_password_change", error);
     return res.status(500).json({ message: "Something went wrong." });
   }
 };
+
