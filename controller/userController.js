@@ -1,11 +1,14 @@
 import db from "../config/db";
+import credentials  from "../config/credential.json";
 const User = db.user;
-import helper from "../utils/helper";
+import helper  from "../utils/helper";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import transporter from "../middleware/emailConfig";
 import * as dotenv from "dotenv";
 dotenv.config();
+import { google } from 'googleapis';
+
 
 // Register_User api
 exports.register_user = async (req, res) => {
@@ -133,6 +136,8 @@ exports.register_user = async (req, res) => {
   }
 };
 
+
+
 // Login_User api
 exports.login_user = async (req, res) => {
   try {
@@ -172,6 +177,55 @@ exports.login_user = async (req, res) => {
   }
 };
 
+
+// Attendance endpoint
+exports.record_attendance = async (req, res) => {
+  try {
+    const { userId } = req.body;
+
+    // Retrieve the user from the database based on the provided userId
+    const user = await User.findByPk(userId);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Generate the login time
+    const loginTime = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }); // Current timestamp in ISO time format
+
+    // Create a JWT client using the credentials
+    const jwtClient = new google.auth.JWT(
+      credentials.client_email,
+      null,
+      credentials.private_key,
+      ['https://www.googleapis.com/auth/spreadsheets']
+    );
+
+    // Authorize the client
+    await jwtClient.authorize();
+
+    // Prepare the data to be written to the spreadsheet
+    const spreadsheetId = "16TAqd6qwGIstzG5jXTssgC8gLM_j4z0PYJtWbRSX2I8";
+    const range = "Sheet1!A:G"; // Assuming the data should be written in columns A and B starting from row 2
+    const values = [[ userId, user.firstName, user.lastName, user.email, user.mobileNumber, user.companyName,  loginTime ]]; // Change this to the desired data
+
+    // Create a Sheets API instance
+    const sheets = google.sheets({ version: 'v4', auth: jwtClient });
+
+    // Write the data to the spreadsheet
+    const request = {
+      spreadsheetId,
+      range,
+      valueInputOption: "USER_ENTERED",
+      resource: { values },
+    };
+    const response = await sheets.spreadsheets.values.append(request);
+    return res.status(200).json({ message: 'Attendance recorded successfully' });
+  } catch (error) {
+    console.error('Error in recordAttendance:', error);
+    return res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
 // Logout_User api
 exports.logout_user = async (req, res) => {
   try {
@@ -187,6 +241,7 @@ exports.logout_user = async (req, res) => {
     return res.status(400).json({ message: "Error in logout_user", error });
   }
 };
+
 
 // Send_User_Password_Reset_Email api
 exports.send_user_password_reset_email = async (req, res) => {
@@ -225,6 +280,7 @@ exports.send_user_password_reset_email = async (req, res) => {
       .json({ message: "Error in send_user_password_reset_email", error });
   }
 };
+
 
 // User_Password_Reset api
 exports.user_password_reset = async (req, res) => {
@@ -269,6 +325,7 @@ exports.user_password_reset = async (req, res) => {
     return res.status(500).json({ message: "Link Expire" });
   }
 };
+
 
 // User_Change_Password api
 exports.user_password_change = async (req, res) => {

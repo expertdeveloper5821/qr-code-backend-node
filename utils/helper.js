@@ -34,7 +34,7 @@ const checkToken = async (req, res, next) => {
       });
     } else {
       const token = header.split(" ")[1];
-      const decode = jwt.verify(token, process.env.SECRETKEY);
+      const decode = jwt.verify(token, process.env.JWT_SECRET);
       if (decode.userId) {
         req.userId = decode.userId;
         next();
