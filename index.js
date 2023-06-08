@@ -1,7 +1,7 @@
 import express from "express";
 const app = express();
 import bodyParser from "body-parser";
-import("./config/db");
+import "./config/db";
 import * as dotenv from "dotenv";
 dotenv.config();
 import cors from "cors";
