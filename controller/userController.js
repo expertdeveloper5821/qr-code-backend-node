@@ -283,7 +283,7 @@ exports.send_user_password_reset_email = async (req, res) => {
           expiresIn: "5m",
         });
         // convert id into query
-        const link = `https://qr-code-fronted.vercel.app/resetpassword/?token=${token}`;
+        const link = `http://192.168.1.11:3000/resetpassword/?token=${token}`;
         // send email
         let info = await transporter.sendMail({
           from: process.env.EMAIL_FROM,
