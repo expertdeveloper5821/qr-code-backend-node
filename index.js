@@ -1,10 +1,10 @@
 import express from "express";
 const app = express();
 import bodyParser from "body-parser";
-import("./config/db");
 import * as dotenv from "dotenv";
 dotenv.config();
 import cors from "cors";
+import './config/db';
 
 import userRoute from "./router/userRouter";
 
@@ -32,7 +32,7 @@ app.get("/", function (req, res) {
 });
 
 // Database connection
-const PORT = process.env.PORT;
+const PORT = 5000;
 app.listen(PORT, () => {
   console.log(`Server started on port ${PORT}...👍️`);
 });
