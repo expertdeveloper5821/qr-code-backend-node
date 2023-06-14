@@ -131,6 +131,7 @@ exports.register_user = async (req, res) => {
     }
   } catch (error) {
     console.error("Error in register_user => register_user", error);
+    return res.status(500).json({ message: "Server error" });
   }
 };
 
@@ -283,7 +284,7 @@ exports.send_user_password_reset_email = async (req, res) => {
           expiresIn: "5m",
         });
         // convert id into query
-        const link = `http://192.168.1.11:3000/resetpassword/?token=${token}`;
+        const link = `https://rozi-app.vercel.app/resetpassword/?token=${token}`;
         // send email
         let info = await transporter.sendMail({
           from: process.env.EMAIL_FROM,
