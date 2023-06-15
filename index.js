@@ -12,8 +12,8 @@ import userRoute from "./router/userRouter";
 app.use(express.json());
 app.use(
   cors({
-    origin: "*",
-    methods: "GET,POST,PUT,DELETE",
+    origin: "https://rozi-app-new.vercel.app",
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
     credentials: true,
   })
 );
