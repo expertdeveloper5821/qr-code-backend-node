@@ -124,6 +124,7 @@ exports.register_user = async (req, res) => {
     });
     // Save the user
     const createdUser = await User.create(newUser);
+    
     if (createdUser?._id) {
       return res.status(200).json({ message: "User registered Successfully" });
     } else {
